@@ -1,4 +1,7 @@
 FROM hrishi2861/terabox:heroku
+
+EXPOSE 8080
+
 WORKDIR /app
 COPY requirements.txt .
 RUN uv venv
