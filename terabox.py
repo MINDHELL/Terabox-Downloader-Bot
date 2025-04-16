@@ -16,6 +16,12 @@ import uuid
 import urllib.parse
 from urllib.parse import urlparse
 import requests
+from healthcheck import start_health_check
+
+# Start health check server
+start_health_check()
+
+# Continue with the rest of your bot logic...
 
 load_dotenv('config.env', override=True)
 logging.basicConfig(
