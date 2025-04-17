@@ -3,7 +3,8 @@ import aria2p
 from datetime import datetime
 from status import format_progress_bar
 import asyncio
-import os, time
+import os
+import time
 import logging
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -14,12 +15,12 @@ aria2 = aria2p.API(
         secret=""
     )
 )
-
 options = {
     "max-tries": "50",
     "retry-wait": "3",
     "continue": "true"
 }
+
 aria2.set_global_options(options)
 
 
@@ -29,16 +30,18 @@ async def download_video(url, reply_msg, user_mention, user_id):
         response.raise_for_status()
         data = response.json()
 
-        # New structure of API response
-        fast_download_link = data.get("direct_link")
-        hd_download_link = data.get("link")  # fallback
-        thumbnail_url = data.get("thumb")
         video_title = data.get("file_name")
+        fast_download_link = data.get("link")
+        direct_download_link = data.get("direct_link")
+        thumbnail_url = data.get("thumb")
 
-        if not all([fast_download_link, thumbnail_url, video_title]):
-            raise ValueError("Incomplete video data from API.")
+        # Try fast download link first
+        try:
+            download = aria2.add_uris([fast_download_link])
+        except Exception as e:
+            logging.warning(f"Fast download link failed: {e}")
+            download = aria2.add_uris([direct_download_link])
 
-        download = aria2.add_uris([fast_download_link])
         start_time = datetime.now()
 
         while not download.is_complete:
@@ -49,6 +52,7 @@ async def download_video(url, reply_msg, user_mention, user_id):
             speed = download.download_speed
             eta = download.eta
             elapsed_time_seconds = (datetime.now() - start_time).total_seconds()
+
             progress_text = format_progress_bar(
                 filename=video_title,
                 percentage=percentage,
@@ -74,16 +78,14 @@ async def download_video(url, reply_msg, user_mention, user_id):
                 thumb_file.write(thumbnail_response.content)
 
             await reply_msg.edit_text("ᴜᴘʟᴏᴀᴅɪɴɢ...")
-
             return file_path, thumbnail_path, video_title
 
     except Exception as e:
         logging.error(f"Error handling message: {e}")
-        buttons = []
-        if hd_download_link:
-            buttons.append([InlineKeyboardButton("🚀 HD Video", url=hd_download_link)])
-        if fast_download_link:
-            buttons.append([InlineKeyboardButton("⚡ Fast Download", url=fast_download_link)])
+        buttons = [
+            [InlineKeyboardButton("⚡ Fast Download", url=fast_download_link)],
+            [InlineKeyboardButton("🚀 Direct Download", url=direct_download_link)]
+        ]
         reply_markup = InlineKeyboardMarkup(buttons)
         await reply_msg.reply_text(
             "Fast Download Link For this Video is Broken, Download manually using the Link Below.",
